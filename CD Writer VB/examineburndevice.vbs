@@ -16,7 +16,7 @@ Function Main
     Dim Path                 ' Directory of files to burn
     Dim Stream               ' Data stream for burning device
     
-    Index = 1                ' Second drive on the system
+    Index = 0                ' Second drive on the system
 
     ' Create a DiscMaster2 object to connect to CD/DVD drives.
     Dim g_DiscMaster
@@ -30,13 +30,13 @@ Function Main
 
     ' *** - Formatting to display recorder info
     WScript.Echo "--------------------------------------------------"
-    Wscript.Echo " ActiveRecorderId: " & recorder.ActiveDiscRecorder
-    Wscript.Echo "        Vendor Id: " & recorder.VendorId
-    Wscript.Echo "       Product Id: " & recorder.ProductId
-    Wscript.Echo " Product Revision: " & recorder.ProductRevision
-    Wscript.Echo "       VolumeName: " & recorder.VolumeName
-    Wscript.Echo "   Can Load Media: " & recorder.DeviceCanLoadMedia
-    Wscript.Echo "    Device Number: " & recorder.LegacyDeviceNumber
+    WScript.Echo " ActiveRecorderId: " & recorder.ActiveDiscRecorder
+    WScript.Echo "        Vendor Id: " & recorder.VendorId
+    WScript.Echo "       Product Id: " & recorder.ProductId
+    WScript.Echo " Product Revision: " & recorder.ProductRevision
+    WScript.Echo "       VolumeName: " & recorder.VolumeName
+    WScript.Echo "   Can Load Media: " & recorder.DeviceCanLoadMedia
+    WScript.Echo "    Device Number: " & recorder.LegacyDeviceNumber
 
     Dim mountPoint
     For Each mountPoint In recorder.VolumePathNames

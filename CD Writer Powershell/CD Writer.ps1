@@ -1,50 +1,55 @@
 #All-in-one:
 
-param($pathToBurn = "Z:\HPE Work 2", $recorderIndex = 0, $closeMediaAfterBurn = $true)
+param($pathToBurn = "Z:\HPE Work", $volumeName = "MyImage", $recorderIndex = 0, $closeMediaAfterBurn = $true)
 
 $ok = $true
 
-#create the image:
+# Check the media in the drive
+$dm = New-Object -ComObject "IMAPI2.MsftDiscMaster2"
 
-$fsi = New-Object -ComObject "IMAPI2FS.MsftFileSystemImage"
+#initialize the recorder:
+$recorder = New-Object -ComObject "IMAPI2.MsftDiscRecorder2"
 
-$fsi.FileSystemsToCreate = 7
+$recorder.InitializeDiscRecorder($dm.Item($recorderIndex))
 
-$fsi.VolumeName = "MyImage"
+Write-Output "INFO : Initialised recorder"
+#use formatter to burn the data:
 
-# Try to add the specified directory to the in memory file system
-try {
-    $fsi.Root.AddTreeWithNamedStreams($pathToBurn, $false)
-} catch {
-    Write-Output "Could not find path $pathToBurn : $PSItem"
+$df2d = New-Object -ComObject IMAPI2.MsftDiscFormat2Data
+$df2d.Recorder = $recorder
+$df2d.ClientName = "MyScriptBurner"
+$df2d.ForceMediaToBeClosed = $closeMediaAfterBurn
+
+if ( $df2d.MediaPhysicallyBlank -eq $false ) {
+    Write-Output "ERROR : Disc must be blank"
     $ok = $false
 }
 
 if ( $ok ) {
+    # Create the in memory disc image:
+    $fsi = New-Object -ComObject "IMAPI2FS.MsftFileSystemImage"
 
-    $resultimage = $fsi.CreateResultImage()
+    $fsi.FileSystemsToCreate = 7
 
-    $resultStream = $resultimage.ImageStream
+    $fsi.VolumeName = $volumeName
 
-    #initialize the recorder:
+    # Try to add the specified directory to the in memory file system
+    Write-Output "INFO : Adding contents of $pathToBurn to burn image ..."
+    try {
+        $fsi.Root.AddTreeWithNamedStreams($pathToBurn, $false)
+    } catch {
+        Write-Output "Could not find path $pathToBurn : $PSItem"
+        $ok = $false
+    }
 
-    $dm = New-Object -ComObject "IMAPI2.MsftDiscMaster2"
+    if ( $ok ) {
 
-    $recorder = New-Object -ComObject "IMAPI2.MsftDiscRecorder2"
+        Write-Output "INFO : Creating iso disc image ... "
+        $resultimage = $fsi.CreateResultImage()
 
-    $recorder.InitializeDiscRecorder($dm.Item($recorderIndex))
+        $resultStream = $resultimage.ImageStream
 
-    #use formatter to burn the data:
-
-    $df2d = New-Object -ComObject IMAPI2.MsftDiscFormat2Data
-
-    $df2d.Recorder = $recorder
-
-    $df2d.ClientName = "MyScriptBurner"
-
-    $df2d.ForceMediaToBeClosed = $closeMediaAfterBurn
-
-    #burn it:
-
-    $df2d.Write($resultStream)
+        Write-Output "INFO : Now burning the image ... "
+        $df2d.Write($resultStream)
+    }
 }
