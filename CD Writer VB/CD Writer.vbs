@@ -8,6 +8,14 @@
 '
 ' If write succeeds an exit code of 0 is returned
 ' 
+' Command line arguments
+' userPath     - Specify the source directory to write to disc - Default Z:\HPE Work
+' isProduction - True|False                                    - Default True
+' driveIndex   - Index of the drive to write to                - Default 0
+' 
+' e.g. cscript './CD Writer.vbs' 'C:\Downloads' False
+' This will burn the contents of C:\Downloads onto any type of blank writeable media in the first writeable drive.
+'
 ' Author : Mark Dodson (DodTech Ltd)
 ' Created : 09/09/2021
 
@@ -51,7 +59,7 @@ Const IMAPI_MEDIA_TYPE_DISK               = 12 ' Randomly writable
 ' *** IMAPI2 Data Media States
 Const IMAPI_FORMAT2_DATA_MEDIA_STATE_UNKNOWN            = 0
 Const IMAPI_FORMAT2_DATA_MEDIA_STATE_INFORMATIONAL_MASK = 15    
-Const IMAPI_FORMAT2_DATA_MEDIA_STATE_UNSUPPORTED_MASK   = 61532 '0xfc00
+Const IMAPI_FORMAT2_DATA_MEDIA_STATE_UNSUPPORTED_MASK   = 64512 '0xfc00
 Const IMAPI_FORMAT2_DATA_MEDIA_STATE_OVERWRITE_ONLY     = 1
 Const IMAPI_FORMAT2_DATA_MEDIA_STATE_BLANK              = 2
 Const IMAPI_FORMAT2_DATA_MEDIA_STATE_APPENDABLE         = 4     
@@ -65,6 +73,7 @@ Const IMAPI_FORMAT2_DATA_MEDIA_STATE_UNSUPPORTED_MEDIA  = 32768 '0x8000
 
 Dim userPath:     userPath = ""
 Dim isProduction: isProduction = True
+Dim driveIndex:   driveIndex = 0
 if WScript.Arguments.Count <> 0 Then
     if WScript.Arguments.Count >=1 Then
         userPath = WScript.Arguments.Item(0)
@@ -72,6 +81,10 @@ if WScript.Arguments.Count <> 0 Then
 
     if WScript.Arguments.Count >=2 Then
         isProduction = WScript.Arguments.Item(1)
+    end if
+
+    if WScript.Arguments.Count >=3 Then
+        driveIndex = WScript.Arguments.Item(2)
     end if
 end if
 
@@ -221,70 +234,103 @@ Function isMediaTypeAvailable(ByRef mediaType, dataWriter)
 End Function
 
 ' Event handler - Progress updates when writing data
-SUB dwBurnEvent_Update( byRef object, byRef progress )
-    DIM strTimeStatus
+Sub dwBurnEvent_Update( byRef object, byRef progress )
+    Dim strTimeStatus
     strTimeStatus = "Time: " & progress.ElapsedTime & _
         " / " & progress.TotalTime
    
-    SELECT CASE progress.CurrentAction
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_VALIDATING_MEDIA
+    Select Case progress.CurrentAction
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_VALIDATING_MEDIA
         WScript.Echo "Validating media " & strTimeStatus
 
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_FORMATTING_MEDIA
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_FORMATTING_MEDIA
         WScript.Echo "Formatting media " & strTimeStatus
         
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_INITIALIZING_HARDWARE
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_INITIALIZING_HARDWARE
         WScript.Echo "Initializing Hardware " & strTimeStatus
 
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_CALIBRATING_POWER
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_CALIBRATING_POWER
         WScript.Echo "Calibrating Power (OPC) " & strTimeStatus
 
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_WRITING_DATA
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_WRITING_DATA
         DIM totalSectors, writtenSectors, percentDone
         totalSectors = progress.SectorCount
         writtenSectors = progress.LastWrittenLba - progress.StartLba
         percentDone = FormatPercent(writtenSectors/totalSectors)
         WScript.Echo "Progress:  " & percentDone & "  " & strTimeStatus
 
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_FINALIZATION
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_FINALIZATION
         WScript.Echo "Finishing the writing " & strTimeStatus
     
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_COMPLETED
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_COMPLETED
         WScript.Echo "Completed the burn."
 
-    CASE IMAPI_FORMAT2_DATA_WRITE_ACTION_VERIFYING
+    Case IMAPI_FORMAT2_DATA_WRITE_ACTION_VERIFYING
         WScript.Echo "Verifying the data."
 
-    CASE ELSE
+    Case else
         WScript.Echo "Unknown action: " & progress.CurrentAction
-    END SELECT
-END SUB
+    End Select
+End Sub
+
 
 Sub DisplayMediaStatus(mediaStatus)
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_FINALIZED AND mediaStatus then
-        WScript.Echo "    Media has already been finalised."
-    end if
+    Dim unsupportedBits, statusBits
 
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_UNKNOWN AND mediaStatus then
+    unsupportedBits = IMAPI_FORMAT2_DATA_MEDIA_STATE_UNSUPPORTED_MASK And mediaStatus
+    statusBits = IMAPI_FORMAT2_DATA_MEDIA_STATE_INFORMATIONAL_MASK And mediaStatus
+
+    if mediaStatus = IMAPI_FORMAT2_DATA_MEDIA_STATE_UNKNOWN Then
         WScript.Echo "    Media state is unknown."
+    elseif unsupportedBits <> 0 Then
+        WScript.Echo "    Media is unsupported because "
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_DAMAGED AND mediaStatus then
+            WScript.Echo "    it is damaged."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_ERASE_REQUIRED AND mediaStatus then
+            WScript.Echo "    it needs erasing."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_NON_EMPTY_SESSION AND mediaStatus then
+            WScript.Echo "    the current session is not empty."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_WRITE_PROTECTED AND mediaStatus then
+            WScript.Echo "    it is write protected."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_FINALIZED AND mediaStatus then
+            WScript.Echo "    it has already been finalised."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_UNSUPPORTED_MEDIA AND mediaStatus then
+            WScript.Echo "    it is unsupported media."
+        end if
     end if
 
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_OVERWRITE_ONLY AND mediaStatus then
-        WScript.Echo "    Currently, only overwriting is supported."
-    end if
+    ' Are any of the status bits set ?
+    if statusBits <> 0 Then
 
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_APPENDABLE AND mediaStatus then
-        WScript.Echo "    Media is currently appendable."
-    end if
+        WScript.Echo "    Media state is "
 
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_FINAL_SESSION AND mediaStatus then
-        WScript.Echo "    Media is in final writing session."
-    end if
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_OVERWRITE_ONLY AND mediaStatus then
+            WScript.Echo "    only overwriting is supported."
+        end if
 
-    if IMAPI_FORMAT2_DATA_MEDIA_STATE_DAMAGED AND mediaStatus then
-        WScript.Echo "    Media is damaged."
-    end if
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_BLANK AND mediaStatus then
+            WScript.Echo "    blank."
+        end if
 
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_APPENDABLE AND mediaStatus then
+            WScript.Echo "    Appendable."
+        end if
+
+        if IMAPI_FORMAT2_DATA_MEDIA_STATE_FINAL_SESSION AND mediaStatus then
+            WScript.Echo "    Media is in final writing session."
+        end if
+    End If
 End Sub
 
 Sub DisplayMediaType(dMediaType)

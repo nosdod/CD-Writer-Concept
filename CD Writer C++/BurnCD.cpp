@@ -58,7 +58,8 @@ BOOL CBurnCDApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-    ::CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    //::CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
 	CBurnCDDlg dlg;
 	m_pMainWnd = &dlg;
