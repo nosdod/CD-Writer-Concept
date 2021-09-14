@@ -1,1 +1,3 @@
-﻿  BurnCD.vcxproj -> Z:\HPE Work\CD Writer C++\Debug\BurnCD.exe
+﻿cl : command line warning D9035: option 'Gm' has been deprecated and will be removed in a future release
+  BurnCD.cpp
+  BurnCD.vcxproj -> Z:\HPE Work\CD Writer C++\Debug\BurnCD.exe
